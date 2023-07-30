@@ -6,13 +6,27 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"golang.org/x/sys/unix"
 )
 
 func Test_connectSerial(t *testing.T) {
 	if os.Getuid() != 0 {
 		t.Skip("Must be root to run this test")
 	}
-	port, err := connectSerial("/dev/tty0")
+	port, err := ConnectSerial("/dev/tty0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer port.Close()
+	t.Logf("Connected to serial port: %v", port)
+}
+
+func Test_newSerial(t *testing.T) {
+	if os.Getuid() != 0 {
+		t.Skip("Must be root to run this test")
+	}
+	port, err := newSerial("/dev/ttyCER0", unix.Termios{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,11 +47,11 @@ func Test_getBaudRate(t *testing.T) {
 	baud := split[1]
 	t.Logf("Baud rate from `stty`: %v", baud)
 
-	res, err := getBaudRate("/dev/tty0")
+	res, err := GetBaudRate("/dev/tty0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("Baud rate from `getBaudRate`: %v", res)
+	t.Logf("Baud rate from `GetBaudRate`: %v", res)
 
 	if baud != strconv.Itoa(res) {
 		t.Fatalf("Baud rate mismatch: %v != %v", baud, res)

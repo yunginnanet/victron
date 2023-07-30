@@ -19,7 +19,7 @@ func concept(w http.ResponseWriter, r *http.Request) {
 		HandshakeTimeout: 5 * time.Second,
 		ReadBufferSize:   1024,
 		WriteBufferSize:  1024,
-		// Subprotocols:      nil,
+		Subprotocols:     []string{"serial"},
 		// Error:             nil,
 		// CheckOrigin:       nil,
 		EnableCompression: true,
