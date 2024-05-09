@@ -1,15 +1,16 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"os"
-	//	"strings"
+	"sync"
+	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/tarm/serial"
 
 	"git.tcp.direct/kayos/common/pool"
 
+	"git.tcp.direct/kayos/cereal/pkg/victron"
 	cereal "git.tcp.direct/kayos/cereal/scratch"
 
 	"git.tcp.direct/tcp.direct/database/bitcask"
@@ -36,38 +37,67 @@ func init() {
 	log = zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout}).With().Timestamp().Logger()
 }
 
-type MPPT struct {
-}
-
-func main() {
+func setup() []*victron.Stream {
 	if len(os.Args) < 2 {
 		log.Fatal().Msg("Must specify a serial port")
 	}
-	portal, err := cereal.ConnectSerialBaud(os.Args[1], 19200)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to connect to serial port")
-	}
-	defer portal.Close()
-	log.Info().Msgf("Connected to serial port: %v", portal)
-	xerox := bufio.NewScanner(portal)
-
-	logFile, err := os.Create("victron.log")
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to create log file")
-	}
-	defer logFile.Close()
-
-	for xerox.Scan() {
-		lineBytes := xerox.Bytes()
-		_, _ = logFile.Write(lineBytes)
-		_, _ = logFile.Write([]byte("\n"))
-		line := string(bytes.TrimSpace(xerox.Bytes()))
-		log.Trace().Msgf("Got a line: %s", string(line))
-		switch {
-		case len(bytes.TrimSpace(lineBytes)) == 0:
-			//
-		default:
-
+	var devices []*victron.Stream
+	for _, path := range os.Args[1:] {
+		portal, err := cereal.ConnectSerialBaud(path, 19200)
+		if err != nil {
+			log.Fatal().Str("caller", path).Err(err).Msg("Failed to connect to serial port")
 		}
+
+		log.Info().Str("caller", path).Msgf("Connected to serial port: %v", portal)
+		devices = append(devices, victron.NewStream(path, portal.(*serial.Port)))
 	}
+	return devices
+}
+
+var (
+	Devices      = make(map[string]*victron.Device)
+	DevicesMutex = sync.RWMutex{}
+)
+
+func main() {
+	devices := setup()
+	quit := make(chan struct{})
+	for _, vdev := range devices {
+		go func(device *victron.Stream) {
+			for {
+				block, _ := device.ReadBlock()
+				if !block.Validate() {
+					log.Warn().Msg("Invalid block, sleeping...")
+					time.Sleep(500 * time.Millisecond)
+					continue
+				}
+				blockDeviceSerial, ok := block.Fields[victron.PrefixSerial]
+				if !ok {
+					// FIXME, there is a second block with the serial number that shpuld be handled
+					// log.Warn().Msg("No serial number in block, skipping...")
+					// fmt.Printf("%+v\n", block)
+					continue
+				}
+				DevicesMutex.RLock()
+				blockDevice, ok := Devices[blockDeviceSerial]
+				DevicesMutex.RUnlock()
+				if !ok {
+					var err error
+					blockDevice, err = victron.NewDevice()
+					if err != nil {
+						panic(err.Error())
+					}
+					DevicesMutex.Lock()
+					Devices[blockDeviceSerial] = blockDevice
+					DevicesMutex.Unlock()
+				}
+				if err := blockDevice.Update(block); err != nil {
+					log.Panic().Err(err).Msg("Failed to update device")
+				}
+				// log.Info().Msgf("Updated device: %v", blockDevice)
+			}
+		}(vdev)
+	}
+	<-quit
+
 }
