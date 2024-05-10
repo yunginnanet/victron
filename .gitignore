@@ -1,2 +1,4 @@
 *.test
 .idea/
+cmd/*/.data
+cmd/victron-ingest/victron-ingest
