@@ -7,6 +7,7 @@ require (
 	git.tcp.direct/tcp.direct/database v0.0.0-20230326075721-ff39591cbe05
 	github.com/akrylysov/pogreb v0.10.1
 	github.com/bytedance/sonic v1.11.6
+	github.com/davecgh/go-spew v1.1.1
 	github.com/gorilla/websocket v1.5.0
 	github.com/l0nax/go-spew v1.3.0
 	github.com/lxc/lxd v0.0.0-20221210053736-e7d33e9707e9
