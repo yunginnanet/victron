@@ -111,9 +111,9 @@ func setup() []*victron.Stream {
 		}
 
 		log.Info().Str("caller", path).Msgf("Connected to serial port: %v", portal)
-		devices = append(devices, victron.NewStream(path, portal.(*serial.Port)).WithDebugPrinter(func(s string) {
-			debugPrinter(path, s)
-		}))
+		devices = append(devices, victron.NewStream(path, portal.(*serial.Port)).
+			WithDebugPrinter(func(s string) { debugPrinter(path, s) }),
+		)
 	}
 	return devices
 }

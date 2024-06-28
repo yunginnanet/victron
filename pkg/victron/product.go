@@ -7,7 +7,7 @@ type (
 
 const (
 	CategoryUnknown Category = iota
-	CategoryBattery
+	CategoryBMV
 	CategorySolar
 	CategoryInverter
 	CategoryController
