@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	safeSpew "github.com/davecgh/go-spew/spew"
 	"github.com/l0nax/go-spew/spew"
 	"github.com/rs/zerolog"
 	"github.com/tarm/serial"
@@ -159,6 +160,17 @@ func init() {
 	debug.MaxDepth = 2
 }
 
+func debugSdump(dev *victron.Device) (spewed string) {
+	defer func() {
+		if r := recover(); r != nil {
+			println("[WARN] colored spew panic, falling back to upstream spew...")
+			spewed = safeSpew.Sdump(dev.Status())
+		}
+	}()
+	spewed = debug.Sdump(dev.Status())
+	return
+}
+
 func stream(ctx context.Context, serialStream *victron.Stream) {
 	slog := log.With().Str("caller", serialStream.Port()).Logger()
 	for {
@@ -239,7 +251,8 @@ func stream(ctx context.Context, serialStream *victron.Stream) {
 		if err = dev.Update(block); err != nil {
 			slog.Panic().Err(err).Msg("Failed to update device")
 		}
-		slog.Debug().Msg(debug.Sdump(dev.Status()))
+
+		slog.Debug().Msg(debugSdump(dev))
 
 	}
 }
