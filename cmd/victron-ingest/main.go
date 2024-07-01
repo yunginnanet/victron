@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"io"
 	"os"
 	"os/signal"
 	"sync"
@@ -86,17 +87,35 @@ func watchForOSSignals() chan os.Signal {
 	return sig
 }
 
+func mustCreateLogFile() io.Writer {
+	targetFile := "./victron.log"
+	if os.Getenv("VICTRON_LOG") != "" {
+		targetFile = os.Getenv("VICTRON_LOG")
+	}
+	f, err := os.OpenFile(targetFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		println(err.Error())
+		os.Exit(1)
+	}
+	return f
+}
+
 func init() {
 	realStdout := os.Stdout
 
-	log = zerolog.New(zerolog.ConsoleWriter{Out: realStdout}).With().Timestamp().Logger()
+	cw := zerolog.ConsoleWriter{Out: realStdout}
+	f := mustCreateLogFile()
+	mw := zerolog.MultiLevelWriter(cw, f)
+
+	log = zerolog.New(mw).With().Timestamp().Logger()
+
 	hijackConsole()
 	flags()
 	log.Trace().Msg("stdout and stderr redirected to logger")
 }
 
 func debugPrinter(prefix string, s string) {
-	log.Debug().Msg(s)
+	log.Debug().Str("caller", prefix).Msg(s)
 }
 
 func setup() []*victron.Stream {

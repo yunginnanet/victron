@@ -56,16 +56,14 @@ func (b *Blocks) Len() int {
 }
 
 func (b *Blocks) readBlock(stream *vedirect.Stream) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
 	var nb vedirect.Block
 	var n int
 	if nb, n = stream.ReadBlock(); n != 0 || !nb.Validate() {
+		b.mu.Lock()
 		b.lastBlock = nb // for debugging, so set it even if it's invalid
+		b.mu.Unlock()
 		return ErrBadChecksumModulus
 	}
-	b.lastBlock = nb
-	b.blocks = append(b.blocks, nb)
 	reflected := reflect.ValueOf(&nb).Elem().FieldByName("fields")
 	if !reflected.IsValid() {
 		return errors.New("reflection failure: no fields in block")
@@ -76,5 +74,9 @@ func (b *Blocks) readBlock(stream *vedirect.Stream) error {
 	for _, key := range reflected.MapKeys() {
 		b.Fields[key.String()] = reflected.MapIndex(key).String()
 	}
+	b.mu.Lock()
+	b.lastBlock = nb
+	b.blocks = append(b.blocks, nb)
+	b.mu.Unlock()
 	return nil
 }

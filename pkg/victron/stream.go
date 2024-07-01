@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/davecgh/go-spew/spew" // use normal package because debugging callers probably don't want color
+	"github.com/l0nax/go-spew/spew" // use normal package because debugging callers probably don't want color
 	"github.com/rosenstand/go-vedirect/vedirect"
 	"github.com/tarm/serial"
 )
@@ -18,20 +18,25 @@ func NewStream(serialDevice string, port *serial.Port) *Stream {
 }
 
 func (s *Stream) WithDebugPrinter(f func(string)) *Stream {
+	s.mu.Lock()
 	s.debugPrinter = f
+	s.mu.Unlock()
 	return s
 }
 
 type Stream struct {
 	*vedirect.Stream
 	dev          *Device
-	mu           sync.Mutex
+	mu           sync.RWMutex
 	debugPrinter func(string)
 }
 
 func (s *Stream) DebugPrintln(msg string) {
-	if s.debugPrinter != nil {
-		s.debugPrinter(msg)
+	s.mu.RLock()
+	dp := s.debugPrinter
+	s.mu.RUnlock()
+	if dp != nil {
+		dp(msg)
 	}
 }
 
@@ -53,7 +58,10 @@ func (s *Stream) Device() (*Device, bool) {
 }
 
 func (s *Stream) Port() string {
-	return s.Stream.Device
+	s.mu.RLock()
+	p := s.Stream.Device
+	s.mu.RUnlock()
+	return p
 }
 
 var ErrDeviceNotAssociated = errors.New("device not associated with stream")
