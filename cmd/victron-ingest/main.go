@@ -125,13 +125,13 @@ func setup() []*victron.Stream {
 	}
 	var devices []*victron.Stream
 	for _, path := range os.Args[1:] {
-		portal, err := cereal.ConnectSerialBaud(path, 19200)
+		sport, err := cereal.ConnectSerialBaud(path, 19200)
 		if err != nil {
 			log.Fatal().Str("caller", path).Err(err).Msg("Failed to connect to serial port")
 		}
 
-		log.Info().Str("caller", path).Msgf("Connected to serial port: %v", portal)
-		devices = append(devices, victron.NewStream(path, portal.(*serial.Port)).
+		log.Info().Str("caller", path).Msgf("Connected to serial port: %v", sport)
+		devices = append(devices, victron.NewStream(path, sport.(*serial.Port)).
 			WithDebugPrinter(func(s string) { debugPrinter(path, s) }),
 		)
 	}

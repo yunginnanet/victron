@@ -83,33 +83,34 @@ func (s *Stream) ReadBlocks(ctx context.Context) (*Blocks, error) {
 		case <-ctx.Done():
 			return combined, ctx.Err()
 		default:
-			err := combined.readBlock(s.Stream)
-			if errors.Is(err, ErrBadChecksumModulus) {
-				s.DebugPrintln("bad checksum modulus, skipping block: ")
-				s.DebugPrintln(spew.Sdump(combined.lastBlock))
-				continue
-			}
-			if err != nil {
-				s.DebugPrintln("failed to read block: " + err.Error())
-				return combined, err
-			}
 		}
+
+		err := combined.readBlock(s.Stream)
+		if errors.Is(err, ErrBadChecksumModulus) {
+			s.DebugPrintln("bad checksum modulus, skipping block: ")
+			s.DebugPrintln(spew.Sdump(combined.lastBlock))
+			continue
+		}
+		if err != nil {
+			s.DebugPrintln("failed to read block: " + err.Error())
+			return combined, err
+		}
+
 		if combined.Validate() {
 			break
 		}
-		if !combined.Validate() {
-			s.DebugPrintln("failed to validate blocks: ")
-			s.DebugPrintln(spew.Sdump(combined))
-			s.DebugPrintln("dropping invalid blocks...")
-			if n := combined.DropInvalid(); n > 0 {
-				s.DebugPrintln(fmt.Sprintf("dropped %d invalid blocks", n))
-			} else if n == 0 {
-				s.DebugPrintln("no invalid blocks to drop...")
-				continue
-			}
-			if combined.Validate() {
-				break
-			}
+
+		s.DebugPrintln("failed to validate blocks: ")
+		s.DebugPrintln(spew.Sdump(combined))
+		s.DebugPrintln("dropping invalid blocks...")
+		if n := combined.DropInvalid(); n > 0 {
+			s.DebugPrintln(fmt.Sprintf("dropped %d invalid blocks", n))
+		} else if n == 0 {
+			s.DebugPrintln("no invalid blocks to drop...")
+			continue
+		}
+		if combined.Validate() {
+			break
 		}
 	}
 

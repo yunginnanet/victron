@@ -2,6 +2,7 @@ package victron
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"sync"
 
@@ -55,6 +56,31 @@ func (b *Blocks) Len() int {
 	return blen
 }
 
+func GetFields(nb vedirect.Block, target map[string]string) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			println("[WARN] GetFields panic:", r)
+			if _, ok := r.(error); !ok {
+				err = errors.New(fmt.Sprintf("%v", r))
+			} else {
+				err = r.(error)
+			}
+		}
+	}()
+
+	reflected := reflect.ValueOf(&nb).Elem().FieldByName("fields")
+	if !reflected.IsValid() {
+		return errors.New("reflection failure: no fields in block")
+	}
+	if reflected.Kind() != reflect.Map {
+		return errors.New("reflection failure: fields is not a map")
+	}
+	for _, key := range reflected.MapKeys() {
+		target[key.String()] = reflected.MapIndex(key).String()
+	}
+	return nil
+}
+
 func (b *Blocks) readBlock(stream *vedirect.Stream) error {
 	var nb vedirect.Block
 	var n int
@@ -64,15 +90,8 @@ func (b *Blocks) readBlock(stream *vedirect.Stream) error {
 		b.mu.Unlock()
 		return ErrBadChecksumModulus
 	}
-	reflected := reflect.ValueOf(&nb).Elem().FieldByName("fields")
-	if !reflected.IsValid() {
-		return errors.New("reflection failure: no fields in block")
-	}
-	if reflected.Kind() != reflect.Map {
-		return errors.New("reflection failure: fields is not a map")
-	}
-	for _, key := range reflected.MapKeys() {
-		b.Fields[key.String()] = reflected.MapIndex(key).String()
+	if err := GetFields(nb, b.Fields); err != nil {
+		return err
 	}
 	b.mu.Lock()
 	b.lastBlock = nb
